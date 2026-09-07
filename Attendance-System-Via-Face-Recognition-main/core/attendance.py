@@ -14,6 +14,20 @@ class AttendanceSession:
         self.marked_students = set()
         self.records = []
 
+    @staticmethod
+    def _extract_student_id(name):
+        value = str(name).strip()
+        if "_" in value:
+            return value.rsplit("_", 1)[-1]
+        return value
+
+    @staticmethod
+    def _display_name(name):
+        value = str(name).strip()
+        if "_" in value:
+            value = value.rsplit("_", 1)[0]
+        return value.replace("_", " ")
+
     def start(self):
         self.session_id = str(uuid.uuid4())[:8]
         self.start_time = datetime.now()
@@ -34,17 +48,29 @@ class AttendanceSession:
     def mark_attendance(self, name, confidence):
         if not self.is_active:
             return False
-        if name in self.marked_students:
+
+        if not name or str(name).strip().lower() == "unknown":
             return False
         if confidence < config.CONFIDENCE_THRESHOLD:
             return False
 
-        self.marked_students.add(name)
+        student_id = self._extract_student_id(name)
+        display_name = self._display_name(name)
+        attendance_key = student_id.lower()
+
+        # Use the student ID as the unique key. This prevents two students
+        # with the same name from being treated as the same person.
+        if attendance_key in self.marked_students:
+            return False
+
+        self.marked_students.add(attendance_key)
+        now = datetime.now()
         self.records.append({
-            "name": name,
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "confidence": round(confidence, 4),
+            "student_id": student_id,
+            "name": display_name,
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M:%S"),
+            "confidence": round(float(confidence), 4),
         })
         return True
 
